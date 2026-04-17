@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Трекер состояния — шаг 1</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app" data-screen="1.1">
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <span class="time">9:41</span>
+    <span class="sb-right">
+      <svg class="sb-ico" viewBox="0 0 17 11" aria-hidden="true"><path d="M1 7.5a1 1 0 0 1 1-1h1v4H2a1 1 0 0 1-1-1zM5 5.5a1 1 0 0 1 1-1h1v6H6a1 1 0 0 1-1-1zM9 3.5a1 1 0 0 1 1-1h1v8h-1a1 1 0 0 1-1-1zM13 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1z" fill="#000"/></svg>
+      <svg class="sb-ico" viewBox="0 0 16 11" aria-hidden="true"><path fill="#000" d="M8 2.5c2.1 0 4.1.8 5.6 2.3.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7C13.5 1.1 10.8 0 8 0S2.5 1.1.7 3.1c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0C3.9 3.3 5.9 2.5 8 2.5zm0 3.3c1.3 0 2.5.5 3.4 1.4.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7C11.8 4.2 9.9 3.3 8 3.3S4.2 4.2 2.9 5.5c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0C5.5 6.3 6.7 5.8 8 5.8zm0 3.2c.7 0 1.3.3 1.8.8.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7-.9-.9-2.2-1.4-3.5-1.4s-2.6.5-3.5 1.4c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0 .5-.5 1.1-.8 1.8-.8z"/></svg>
+      <svg class="sb-ico sb-bat" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.5" y="0.5" width="21" height="11" rx="2.5" fill="none" stroke="#000" opacity=".35"/><rect x="2" y="2" width="18" height="8" rx="1.5" fill="#000"/><rect x="22.5" y="4" width="1.5" height="4" rx=".5" fill="#000" opacity=".4"/></svg>
+    </span>
+  </div>
+
+  <!-- Appbar -->
+  <div class="appbar">
+    <img class="avatar" src="assets/avatar.png" alt="" />
+    <div class="appbar-text">
+      <span class="caption">Онлайн-сессия</span>
+      <span class="title-row">
+        <span class="title">30 декабря в 20:30</span>
+        <svg class="chev" viewBox="0 0 12 24" aria-hidden="true"><path d="M4 7l5 5-5 5" stroke="#22263b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      </span>
+    </div>
+    <button class="btn-icon" aria-label="Календарь" tabindex="-1">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="4" y="6" width="20" height="18" rx="3" fill="none" stroke="#344079" stroke-width="1.6"/><path d="M4 11h20" stroke="#344079" stroke-width="1.6"/><path d="M9 3v5M19 3v5" stroke="#344079" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="16" r="1.2" fill="#344079"/><circle cx="14" cy="16" r="1.2" fill="#344079"/><circle cx="18" cy="16" r="1.2" fill="#344079"/><circle cx="10" cy="20" r="1.2" fill="#344079"/></svg>
+    </button>
+  </div>
+
+  <!-- Content (blue rounded) -->
+  <div class="content">
+    <!-- Segmented -->
+    <div class="section-pad">
+      <div class="segmented">
+        <div class="seg seg-active">Для меня</div>
+        <div class="seg">Смотреть всё</div>
+      </div>
+    </div>
+
+    <!-- Tracker card -->
+    <div class="tracker-wrap">
+      <!-- 1.1 — выбор настроения -->
+      <div class="tracker tracker-1-1">
+        <div class="tracker-title">
+          Как ваше<br/>
+          <span class="accent-italic">настроение</span> сегодня?
+        </div>
+        <span class="tracker-counter">1/3</span>
+        <div class="mood-row" id="moodRow"></div>
+      </div>
+
+      <!-- 1.2 — подтверждение -->
+      <div class="tracker tracker-1-2">
+        <button class="tracker-back" id="back12" aria-label="Назад">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" stroke="#22263b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </button>
+        <div class="tracker-selected-icon" id="selectedIcon12"></div>
+        <div class="tracker-q">
+          Что повлияло на <span class="accent-italic">настроение</span>?
+        </div>
+        <div class="tracker-sub">Это поможет в работе с рефлексией</div>
+        <div class="tracker-actions">
+          <button class="btn btn-primary btn-wide" id="btnChoose">Выбрать</button>
+          <button class="btn btn-outline btn-square" id="btnSkip" aria-label="Пропустить">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" stroke="#344079" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Request -->
+    <div class="request">
+      <h2 class="request-title">
+        Мы собрали эти материалы <span class="accent-italic">для вас</span>
+      </h2>
+
+      <div class="request-card-wrap">
+        <div class="tooltip">
+          <img class="tooltip-ico" src="assets/info.svg" alt="" />
+          <p>Узнайте, как проходят сессии с психологом и как можно работать над вашим запросом</p>
+          <svg class="tooltip-cross" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="#22263b" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="tooltip-arrow"></div>
+
+        <div class="vs">
+          <div class="card">
+            <h3 class="card-title">Я постоянно о чем-то переживаю</h3>
+            <div class="card-images">
+              <div class="card-img card-img-lg">
+                <img src="assets/card-1.png" alt="" />
+                <span class="card-img-border"></span>
+                <span class="card-play"><svg viewBox="0 0 16 16"><path d="M5 3l9 5-9 5z" fill="#22263b"/></svg></span>
+              </div>
+              <div class="card-img">
+                <img src="assets/card-2.png" alt="" />
+                <span class="card-play"><svg viewBox="0 0 16 16"><path d="M5 3l9 5-9 5z" fill="#22263b"/></svg></span>
+              </div>
+              <div class="card-img">
+                <img src="assets/card-3.png" alt="" />
+                <span class="card-play"><svg viewBox="0 0 16 16"><path d="M5 3l9 5-9 5z" fill="#22263b"/></svg></span>
+              </div>
+              <div class="card-img">
+                <img src="assets/card-4.png" alt="" />
+                <span class="card-play"><svg viewBox="0 0 16 16"><path d="M5 3l9 5-9 5z" fill="#22263b"/></svg></span>
+              </div>
+            </div>
+            <div class="card-content">
+              <div class="card-meta">Часть 1 из 4</div>
+              <div class="card-subtitle">Почему выступать страшно</div>
+              <button class="btn btn-primary btn-play" tabindex="-1">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="#22263b"/></svg>
+                <span>Смотреть</span>
+              </button>
+            </div>
+          </div>
+          <div class="change-topic">
+            <span>Выбрать другую тему</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" stroke="#344079" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabbar -->
+  <div class="tabbar">
+    <div class="tab tab-active">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M5 12l9-7 9 7v11a2 2 0 0 1-2 2h-4v-7h-6v7H7a2 2 0 0 1-2-2z" stroke="#344079" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+      <span>Сегодня</span>
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="10" r="4" stroke="#344079" stroke-width="1.6" fill="none"/><path d="M5 24c1.5-4.5 5-7 9-7s7.5 2.5 9 7" stroke="#344079" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+      <span>Специалисты</span>
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="9" stroke="#344079" stroke-width="1.6" fill="none"/><path d="M14 9v5l3 2" stroke="#344079" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+      <span>Про себя</span>
+    </div>
+  </div>
+  <div class="home-indicator"></div>
+
+</div><!-- /.app -->
+
+<!-- Modal 1.3 -->
+<div class="modal" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-statusbar">
+      <span class="time">9:41</span>
+      <span class="sb-right">
+        <svg class="sb-ico" viewBox="0 0 17 11"><path d="M1 7.5a1 1 0 0 1 1-1h1v4H2a1 1 0 0 1-1-1zM5 5.5a1 1 0 0 1 1-1h1v6H6a1 1 0 0 1-1-1zM9 3.5a1 1 0 0 1 1-1h1v8h-1a1 1 0 0 1-1-1zM13 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1z" fill="#000"/></svg>
+        <svg class="sb-ico" viewBox="0 0 16 11"><path fill="#000" d="M8 2.5c2.1 0 4.1.8 5.6 2.3.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7C13.5 1.1 10.8 0 8 0S2.5 1.1.7 3.1c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0C3.9 3.3 5.9 2.5 8 2.5zm0 3.3c1.3 0 2.5.5 3.4 1.4.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7C11.8 4.2 9.9 3.3 8 3.3S4.2 4.2 2.9 5.5c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0C5.5 6.3 6.7 5.8 8 5.8zm0 3.2c.7 0 1.3.3 1.8.8.2.2.5.2.7 0l1-1c.2-.2.2-.5 0-.7-.9-.9-2.2-1.4-3.5-1.4s-2.6.5-3.5 1.4c-.2.2-.2.5 0 .7l1 1c.2.2.5.2.7 0 .5-.5 1.1-.8 1.8-.8z"/></svg>
+        <svg class="sb-ico sb-bat" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="2.5" fill="none" stroke="#000" opacity=".35"/><rect x="2" y="2" width="18" height="8" rx="1.5" fill="#000"/><rect x="22.5" y="4" width="1.5" height="4" rx=".5" fill="#000" opacity=".4"/></svg>
+      </span>
+    </div>
+
+    <div class="modal-header">
+      <div class="modal-icon" id="modalIcon"></div>
+      <h2 class="modal-title">
+        Что повлияло<br/>на ваше <span class="accent-italic">настроение</span>?
+      </h2>
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#22263b" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="modal-grid-wrap">
+      <div class="modal-grid" id="reasonsGrid"></div>
+    </div>
+
+    <div class="modal-bottom">
+      <button class="btn btn-primary btn-full" tabindex="-1">Продолжить</button>
+      <button class="btn btn-outline btn-full" tabindex="-1">Добавить свое</button>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

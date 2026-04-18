@@ -1,26 +1,69 @@
 # Tracker Prototype — контекст проекта
 
 ## Стек
-Чистый HTML + CSS + Vanilla JS, без сборки. Шрифт Euclid Circular A (куплен, лежит в `fonts/`).
+Чистый HTML + CSS + Vanilla JS, без сборки и зависимостей. Шрифт Euclid Circular A лежит в `fonts/` (Regular/Medium/Semibold/SemiboldItalic, `.woff2`).
 
 ## Запуск
-`.claude/launch.json` → `npx -y serve -l 8123 .` → открывать http://localhost:8123
+`.claude/launch.json` → `npx -y serve -l 8123 .` → http://localhost:8123
 
 ---
 
-## Текущее состояние верстки
+## Архитектура
 
-### Что работает
-- **Экран 1.1** — выбор настроения (5 кнопок с иконками + подписи цветом настроения)
-- **Экран 1.2** — подтверждение (иконка выбранного настроения, кнопки «Выбрать» / стрелка →, chevron назад)
-- **Экран 1.3** — модалка причин (сетка кружков chipBg по настроению, скролл только у кружков, хедер/футер закреплены)
-- Навигация через `data-screen="1.1|1.2|1.3"` на `.app`
-- Statusbar и Appbar прибиты к верху (`flex-shrink: 0`)
-- Tabbar прибит к низу (`flex-shrink: 0`)
-- `.content` скроллится между ними (`flex: 1; min-height: 0; overflow-y: auto`)
+Всё управляется одной state-машиной в [script.js](script.js):
 
-### Текущий баг (не исправлен, прерван юзером)
-`.app` имеет `width: 100%; max-width: 500px` — на широких экранах растягивается до 500px, но юзер считает это «фиксированной шириной». Нужно сделать **резиновый дизайн**: на мобильном — 100% ширины, на широком — тоже 100% но не более 500px. Возможно проблема не в `.app`, а в том, что внутренние элементы имеют хардкоженые ширины (например `width: 302px` у `.tracker-title`, `width: 343px` у `.mood-row`). Нужно заменить все фиксированные `px`-ширины на `%` или убрать.
+```js
+let stepIdx = 0;              // 0..2 — текущий шаг
+let phase = 'select';         // 'select' | 'confirm'
+const selections = [null, null, null];
+const customReasonsByStep = [[], [], []];
+```
+
+`renderTracker()` перерисовывает карточку трекера в зависимости от `stepIdx` и `phase`. Данные шагов — массив `STEPS` с `options`, `reasons`, тайтлами. Опции собираются через `makeOptions(defs)` + единый `PALETTE` из 5 пар цветов (textColor/chipBg).
+
+Иконки:
+- **Шаг 1 (настроение)** — SVG из `assets/mood-*.svg` (с фоном внутри svg)
+- **Шаг 2 (энергия)** — PNG из `assets/шаг 2/*.png`, оборачиваются в `.icon-circle` с `chipBg` (флаг `iconWrap: true`)
+- **Шаг 3 (самочувствие)** — PNG из `assets/шаг 3/*.png`, так же с `iconWrap`
+
+---
+
+## Экраны и флоу
+
+### Карточка трекера (`.tracker-wrap` внутри `.content`)
+
+**Select-фаза:** 5 круглых кнопок равномерно растянуты (`left:16px; right:16px; display:flex; flex:1`), счётчик `1/3` в правом верхнем, кнопка «назад» слева на шагах 2/3.
+
+**Confirm-фаза:** иконка выбранного + вопрос + сабтайтл + две кнопки внизу:
+- Шаги 1, 2 — жёлтая «Выбрать» растягивается (`flex:1`), справа `btn-square` со стрелкой ширина 56px; gap 8px; боковые отступы 16px
+- Шаг 3 — обе кнопки равной ширины (`flex:1`), gap 16px, отступы по бокам 16px; правая кнопка — `btn-done` с чекмарком и текстом «Готово»
+
+### Модалка причин (`#modal`)
+- iOS-стиль bottom sheet: `transform: translateY(100%)` → `translateY(0)`, `cubic-bezier(0.32, 0.72, 0, 1)`, длительность 0.42s
+- Затемнённая подложка `rgba(34,38,59,0.4)` сверху, через которую виден статусбар фонового экрана
+- Сетка кружков-причин (honeycomb) со сдвигом рядов через `margin-bottom: -9px`, `mix-blend-mode: multiply`
+- Выбранный кружок — `background: var(--fg-accent)` (тёмно-синий #344079) + `color: #fff`
+- Кастомная строка добавленных пользователем вариантов получает класс `.modal-grid-row-custom` с `margin-bottom: 8px` (без наложения на обычную сетку)
+- Нижняя кнопка: «Продолжить» на шагах 1, 2; «Готово» на шаге 3
+
+### Модалка «Добавить своё» (`#modalAdd`)
+- Открывается поверх модалки причин с той же iOS-анимацией
+- Инпут получает `.focus()` при открытии (клавиатура на моб. устройствах всплывает сразу)
+- Макс. 15 символов, ошибка показывается через `.is-error` + красный `#f06a6a`
+- После submit — новый кружок добавляется сверху сетки в выбранном состоянии
+
+### Завершение (finishFlow)
+На шаге 3 «Готово» (или в карточке трекера, или в модалке) вызывает `finishFlow()`:
+1. Меряем высоту `trackerWrap`, пишем inline `maxHeight: Nnpx`
+2. Force reflow (`void offsetHeight`)
+3. Добавляем класс `.is-hidden` с `max-height: 0 !important; opacity: 0; padding: 0`
+4. CSS-транзишн плавно схлопывает карточку, контент снизу подъезжает вверх
+
+### Layout-каркас
+- `html, body { overflow: hidden; height: 100% }`
+- `.app` — flex-колонка во всю высоту; `.statusbar`, `.appbar`, `.tabbar` с `flex-shrink: 0`
+- `.content` — `flex:1; min-height:0; overflow-y:auto`, скруглён сверху на 32px
+- Home-indicator удалён; вместо него белый padding-bottom 34px на `.tabbar` и `.modal-bottom`
 
 ---
 
@@ -28,81 +71,26 @@
 
 ```
 tracker-prototype/
-├── index.html          — разметка трёх экранов + модалка 1.3
+├── index.html          — разметка + две модалки
 ├── styles.css          — все стили
-├── script.js           — логика навигации и рендера
+├── script.js           — state-машина, рендер, валидация
 ├── CONTEXT.md          — этот файл
 ├── assets/
-│   ├── mood-1-terrible.svg .. mood-5-great.svg
+│   ├── mood-1..5-*.svg
 │   ├── mood-modal.svg
-│   ├── card-1.png .. card-4.png
+│   ├── card-1..4.png
 │   ├── avatar.png
-│   └── info.svg
-├── fonts/
-│   ├── Regular.woff2
-│   ├── Medium.woff2
-│   ├── Semibold.woff2
-│   └── SemiboldItalic.woff2
-└── .claude/
-    └── launch.json
+│   ├── info.svg
+│   ├── tabbar-icon1.png, tabbar-icon2.png, tabbar-icon-3.png
+│   ├── шаг 2/{выгорел,мало,достаточно,много,полон сил}.png
+│   └── шаг 3/{ужасно,плохо,нормально,хорошо,полон сил}.png
+├── fonts/              — Euclid Circular A в .woff2
+└── .claude/launch.json — конфиг dev-сервера
 ```
 
 ---
 
-## JS — ключевые данные
-
-```js
-const MOODS = [
-  { id: 'terrible', label: 'Ужасно',      textColor: '#a976b8', chipBg: '#ead8ef', icon: 'assets/mood-1-terrible.svg' },
-  { id: 'bad',      label: 'Плохо',       textColor: '#6c6da8', chipBg: '#d7d8eb', icon: 'assets/mood-2-bad.svg' },
-  { id: 'normal',   label: 'Нормально',   textColor: '#4c85b3', chipBg: '#cfe0ed', icon: 'assets/mood-3-normal.svg' },
-  { id: 'good',     label: 'Хорошо',      textColor: '#ca9231', chipBg: '#f5e2bd', icon: 'assets/mood-4-good.svg' },
-  { id: 'great',    label: 'Великолепно', textColor: '#dc831c', chipBg: '#ffddb6', icon: 'assets/mood-5-great.svg' },
-];
-```
-
----
-
-## CSS — текущие ключевые правила
-
-```css
-/* Тело страницы */
-html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-body { background: var(--bg-primary); }
-
-/* Фрейм приложения */
-.app {
-  width: 100%;
-  max-width: 500px;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Закреплённые верх/низ */
-.statusbar, .appbar { flex-shrink: 0; z-index: 1; }
-.tabbar             { flex-shrink: 0; z-index: 1; }
-.home-indicator     { flex-shrink: 0; }
-
-/* Скроллящийся контент */
-.content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--bg-secondary);
-  border-top-left-radius: 32px;
-  border-top-right-radius: 32px;
-}
-
-/* Модалка */
-.modal { position: fixed; inset: 0; display: none; z-index: 100; }
-.app[data-screen='1.3'] ~ .modal { display: flex; }
-.modal-sheet { width: 100%; height: 100%; display: flex; flex-direction: column; }
-.modal-grid-wrap { flex: 1; min-height: 0; overflow-y: auto; }
-```
-
-## CSS токены
+## CSS-токены
 
 ```css
 --bg-primary: #fff
@@ -118,14 +106,25 @@ body { background: var(--bg-primary); }
 --shadow-elev: 0 12px 24px -4px rgba(34,38,59,0.05)
 ```
 
+Палитра шагов (одна и та же на всех трёх):
+
+```js
+[
+  { textColor: '#a976b8', chipBg: '#ead8ef' }, // 1
+  { textColor: '#6c6da8', chipBg: '#d7d8eb' }, // 2
+  { textColor: '#4c85b3', chipBg: '#cfe0ed' }, // 3
+  { textColor: '#ca9231', chipBg: '#f5e2bd' }, // 4
+  { textColor: '#dc831c', chipBg: '#ffddb6' }, // 5
+]
+```
+
 ---
 
-## TODO
+## Готово / возможные следующие шаги
 
-### Срочно (прерванная задача)
-- **Сделать дизайн резиновым**: заменить все хардкоженые `px`-ширины внутри карточек, `.mood-row`, `.tracker-title` и т.д. на относительные (`%`, `max-width`, `clamp`). Юзер хочет чтобы на любой ширине до 500px макет масштабировался корректно, а не выглядел как 375px-фрейм внутри широкого экрана.
+Прототип закрывает флоу трёх шагов: настроение → энергия → самочувствие, с модалками причин и добавлением своих вариантов, плавным сворачиванием карточки в конце.
 
-### Следующие шаги по продукту
-1. **Шаг 2 — Энергия**: новые экраны 2.1/2.2 с иконками энергии, свой массив `ENERGY` с `REASONS`
-2. **Шаг 3 — Физическое самочувствие**: аналогично
-3. Кнопка стрелка → на экране 1.2 должна вести на шаг 2 (сейчас no-op / TODO)
+Потенциальные улучшения:
+- Анимация смены шагов внутри карточки (сейчас мгновенный перерендер)
+- Сохранение выбранных причин в state (сейчас отмеченные чипы живут только в DOM)
+- Финальный экран / action после `finishFlow`

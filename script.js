@@ -140,7 +140,7 @@ const btnAddSubmit = document.getElementById('btnAddSubmit');
 
 // ===== Tracker render =====
 
-const ICO_BACK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" stroke="#22263b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+const ICO_BACK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" stroke="#22263b" stroke-opacity="0.4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
 const ICO_NEXT = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" stroke="#344079" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
 const ICO_CHECK = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8" stroke="#344079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
 
@@ -166,6 +166,30 @@ function renderTracker() {
       btn.addEventListener('click', () => selectOption(opt));
       row.appendChild(btn);
     });
+    // Right-to-left entrance with blur for title
+    const titleEl = tracker.querySelector('.tracker-title');
+    if (titleEl) {
+      gsap.fromTo(
+        titleEl,
+        { opacity: 0, x: 40, filter: 'blur(10px)' },
+        { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out', clearProps: 'filter' }
+      );
+    }
+    // Right-to-left entrance with blur for mood buttons
+    const moodBtns = row.querySelectorAll('.mood-btn');
+    gsap.fromTo(
+      moodBtns,
+      { opacity: 0, x: 40, filter: 'blur(10px)' },
+      {
+        opacity: 1,
+        x: 0,
+        filter: 'blur(0px)',
+        duration: 0.6,
+        ease: 'power3.out',
+        stagger: 0.07,
+        clearProps: 'filter',
+      }
+    );
   } else {
     const sel = selections[stepIdx];
     const isLast = stepIdx === STEPS.length - 1;
@@ -183,6 +207,28 @@ function renderTracker() {
         ${rightBtn}
       </div>
     `;
+  }
+
+  if (phase === 'confirm') {
+    const confirmEls = [
+      tracker.querySelector('.tracker-selected-icon'),
+      tracker.querySelector('.tracker-q'),
+      tracker.querySelector('.tracker-sub'),
+      ...tracker.querySelectorAll('.tracker-actions .btn'),
+    ].filter(Boolean);
+    gsap.fromTo(
+      confirmEls,
+      { opacity: 0, x: 40, filter: 'blur(10px)' },
+      {
+        opacity: 1,
+        x: 0,
+        filter: 'blur(0px)',
+        duration: 0.6,
+        ease: 'power3.out',
+        stagger: 0.07,
+        clearProps: 'filter',
+      }
+    );
   }
 
   tracker.querySelectorAll('[data-action]').forEach((el) => {
@@ -230,9 +276,78 @@ function goNextStep() {
 function finishFlow() {
   const h = trackerWrap.getBoundingClientRect().height;
   trackerWrap.style.maxHeight = h + 'px';
-  // Force reflow so the transition has a starting point
   void trackerWrap.offsetHeight;
-  trackerWrap.classList.add('is-hidden');
+
+  // Center checkmark inside the tracker
+  tracker.innerHTML = `
+    <div class="fx-wrap" style="position:relative;width:100%;height:${h}px;display:flex;align-items:center;justify-content:center;overflow:visible;">
+      <svg viewBox="0 0 120 120" style="width:80px;height:80px;display:block;">
+        <circle class="fx-disc" cx="60" cy="60" r="0" fill="#FFB800"/>
+        <path class="fx-check" d="M42 60 l13 13 l26 -26" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  `;
+
+  const disc = tracker.querySelector('.fx-disc');
+  const check = tracker.querySelector('.fx-check');
+  const checkLen = check.getTotalLength();
+  gsap.set(check, { strokeDasharray: checkLen, strokeDashoffset: checkLen });
+
+  // Confetti — fullscreen overlay so pieces can fly beyond the card
+  const trackerRect = trackerWrap.getBoundingClientRect();
+  const originX = trackerRect.left + trackerRect.width / 2;
+  const originY = trackerRect.top + trackerRect.height / 2;
+
+  const confetti = document.createElement('div');
+  confetti.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
+  document.body.appendChild(confetti);
+
+  const palette = ['#FFB800', '#FFD766', '#FFC947', '#FFA500', '#FFE6A3', '#E89F00'];
+  const PIECES = 70;
+  const pieces = [];
+  for (let i = 0; i < PIECES; i++) {
+    const el = document.createElement('div');
+    const w = 6 + Math.random() * 8;
+    const hPiece = w * (0.4 + Math.random() * 0.9);
+    const isCircle = Math.random() < 0.15;
+    el.style.cssText = `position:absolute;left:${originX}px;top:${originY}px;width:${w}px;height:${hPiece}px;background:${palette[i % palette.length]};border-radius:${isCircle ? '50%' : '1.5px'};margin-left:${-w / 2}px;margin-top:${-hPiece / 2}px;will-change:transform,opacity;`;
+    confetti.appendChild(el);
+    pieces.push(el);
+  }
+
+  pieces.forEach((el) => {
+    // Burst angle — biased upward for a natural fountain
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25;
+    const velocity = 180 + Math.random() * 360;
+    const dx = Math.cos(angle) * velocity;
+    const dyUp = Math.sin(angle) * velocity;
+    const fall = 500 + Math.random() * 500;
+    const rotStart = Math.random() * 360;
+    const rotEnd = rotStart + (Math.random() - 0.5) * 1400;
+    const dur = 1.7 + Math.random() * 1.1;
+
+    gsap.set(el, { rotation: rotStart, scale: 0.75 + Math.random() * 0.7 });
+    gsap.to(el, {
+      keyframes: [
+        { x: dx * 0.55, y: dyUp * 0.55, duration: dur * 0.38, ease: 'power1.out' },
+        { x: dx, y: dyUp + fall, duration: dur * 0.62, ease: 'power2.in' },
+      ],
+    });
+    gsap.to(el, { rotation: rotEnd, duration: dur, ease: 'none' });
+    gsap.to(el, { opacity: 0, duration: dur * 0.35, delay: dur * 0.65, ease: 'power1.in' });
+  });
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      gsap.to(tracker, { opacity: 0, filter: 'blur(8px)', duration: 0.35, ease: 'power2.in' });
+      gsap.delayedCall(0.12, () => trackerWrap.classList.add('is-hidden'));
+    },
+  });
+  tl.to(disc, { attr: { r: 44 }, duration: 0.55, ease: 'back.out(1.8)' }, 0)
+    .to(check, { strokeDashoffset: 0, duration: 0.4, ease: 'power2.out' }, 0.35)
+    .to({}, { duration: 1.6 });
+
+  gsap.delayedCall(3.2, () => confetti.remove());
 }
 
 // ===== Reasons modal =====
@@ -246,6 +361,29 @@ function openReasonsModal() {
   document.getElementById('modalContinue').textContent = isLast ? 'Готово' : 'Продолжить';
   renderReasons();
   modal.classList.add('is-open');
+
+  // Bottom-to-top entrance with blur for all modal elements
+  const els = [
+    modal.querySelector('.modal-icon'),
+    modal.querySelector('.modal-title'),
+    modal.querySelector('.modal-close'),
+    ...modal.querySelectorAll('.modal-grid .chip'),
+    ...modal.querySelectorAll('.modal-bottom .btn'),
+  ].filter(Boolean);
+  gsap.fromTo(
+    els,
+    { opacity: 0, y: 40, filter: 'blur(10px)' },
+    {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.45,
+      ease: 'power3.out',
+      stagger: 0.0225,
+      delay: 0.25,
+      clearProps: 'filter',
+    }
+  );
 }
 
 function closeReasonsModal() {
@@ -293,6 +431,29 @@ function openAddOwn() {
   updateOwnValidation();
   modalAdd.classList.add('is-open');
   ownInput.focus();
+
+  // Bottom-to-top entrance with blur for all modal elements
+  const els = [
+    modalAdd.querySelector('.modal-icon'),
+    modalAdd.querySelector('.modal-title'),
+    modalAdd.querySelector('.modal-close'),
+    modalAdd.querySelector('.text-field'),
+    modalAdd.querySelector('.modal-add-footer .btn'),
+  ].filter(Boolean);
+  gsap.fromTo(
+    els,
+    { opacity: 0, y: 40, filter: 'blur(10px)' },
+    {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.45,
+      ease: 'power3.out',
+      stagger: 0.0225,
+      delay: 0.25,
+      clearProps: 'filter',
+    }
+  );
 }
 
 function closeAddOwn() {

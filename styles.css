@@ -332,7 +332,7 @@ button {
   display: flex;
   gap: 8px;
 }
-.tracker-actions:has(.btn-done) { gap: 16px; }
+.tracker-actions:has(.btn-done) { gap: 8px; }
 
 /* Buttons */
 .btn {

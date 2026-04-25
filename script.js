@@ -531,6 +531,10 @@ function renderReasons() {
     const row = document.createElement('div');
     row.className = 'modal-grid-row modal-grid-row-custom';
     custom.forEach((label) => row.appendChild(makeChip(label, true)));
+    // Pad with hidden placeholder so a single custom chip aligns to the left slot.
+    if (custom.length % 2 === 1) {
+      row.appendChild(makeChip('', false));
+    }
     reasonsGrid.appendChild(row);
   }
 
@@ -603,6 +607,14 @@ document.getElementById('addOwnForm').addEventListener('submit', (e) => {
   customReasonsByStep[stepIdx].unshift(value);
   renderReasons();
   closeAddOwn();
+  // Reveal new custom chip: fade + de-blur with a single soft bounce.
+  const newChip = document.querySelector('.modal-grid-row-custom .chip:not(:empty)');
+  if (newChip) {
+    gsap.fromTo(newChip,
+      { opacity: 0, scale: 0.4, filter: 'blur(100px)' },
+      { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 0.7, ease: 'back.out(2)', delay: 0.1 }
+    );
+  }
 });
 
 document.getElementById('modalClose').addEventListener('click', closeReasonsModal);

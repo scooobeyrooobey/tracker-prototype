@@ -650,6 +650,11 @@ button {
   pointer-events: auto;
   background: rgba(34, 38, 59, 0.4);
 }
+.top-bar {
+  height: 44px;
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
 
 .modal-sheet {
   width: 100%;
@@ -660,7 +665,7 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: 12px 12px 0 0;
+  border-radius: 32px 32px 0 0;
   transform: translateY(100%);
   transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
@@ -715,8 +720,8 @@ button {
   display: flex;
   justify-content: center;
   position: relative;
-  mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
 }
 .modal-grid {
   display: flex;
@@ -729,7 +734,8 @@ button {
   margin-bottom: -9px;
 }
 .modal-grid-row-custom {
-  margin-bottom: 8px;
+  margin-bottom: 0;
+  transform: translateY(4px);
 }
 .chip {
   width: 90px;
@@ -749,6 +755,7 @@ button {
   transition: transform 0.12s ease;
 }
 .chip:hover { transform: scale(1.05); }
+.chip:active { transform: scale(0.9); transition-duration: 0.06s; }
 .chip:empty { visibility: hidden; pointer-events: none; }
 .chip.selected {
   background: var(--fg-accent) !important;

@@ -144,7 +144,49 @@ const ICO_BACK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 
 const ICO_NEXT = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" stroke="#344079" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
 const ICO_CHECK = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8" stroke="#344079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
 
-function renderTracker() {
+// Mirror of the entrance animation: elements continue leftward and blur out.
+let isTransitioning = false;
+
+function getTrackerAnimatedEls() {
+  return [
+    tracker.querySelector('.tracker-back'),
+    tracker.querySelector('.tracker-title'),
+    tracker.querySelector('.tracker-counter'),
+    ...tracker.querySelectorAll('.mood-btn'),
+    tracker.querySelector('.tracker-selected-icon'),
+    tracker.querySelector('.tracker-q'),
+    tracker.querySelector('.tracker-sub'),
+    ...tracker.querySelectorAll('.tracker-actions .btn'),
+  ].filter(Boolean);
+}
+
+function animateOutTracker(onComplete) {
+  const els = getTrackerAnimatedEls();
+  if (els.length === 0) { onComplete(); return; }
+  // Kill any in-flight entrance tweens so exit starts cleanly.
+  gsap.killTweensOf(els);
+  gsap.to(els, {
+    opacity: 0,
+    x: -40,
+    filter: 'blur(10px)',
+    duration: 0.35,
+    ease: 'power3.in',
+    stagger: 0.04,
+    onComplete,
+  });
+}
+
+function transitionRender(updateState) {
+  if (isTransitioning) return;
+  isTransitioning = true;
+  animateOutTracker(() => {
+    updateState();
+    renderTracker();
+    isTransitioning = false;
+  });
+}
+
+function renderTracker(opts = {}) {
   const step = STEPS[stepIdx];
 
   if (phase === 'select') {
@@ -163,33 +205,9 @@ function renderTracker() {
       btn.className = 'mood-btn';
       btn.type = 'button';
       btn.innerHTML = `<span class="mood-ico">${opt.iconHtml}</span><span class="label" style="color: ${opt.textColor}">${opt.label}</span>`;
-      btn.addEventListener('click', () => selectOption(opt));
+      btn.addEventListener('click', (e) => selectOption(opt, e.currentTarget));
       row.appendChild(btn);
     });
-    // Right-to-left entrance with blur for title
-    const titleEl = tracker.querySelector('.tracker-title');
-    if (titleEl) {
-      gsap.fromTo(
-        titleEl,
-        { opacity: 0, x: 40, filter: 'blur(10px)' },
-        { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out', clearProps: 'filter' }
-      );
-    }
-    // Right-to-left entrance with blur for mood buttons
-    const moodBtns = row.querySelectorAll('.mood-btn');
-    gsap.fromTo(
-      moodBtns,
-      { opacity: 0, x: 40, filter: 'blur(10px)' },
-      {
-        opacity: 1,
-        x: 0,
-        filter: 'blur(0px)',
-        duration: 0.6,
-        ease: 'power3.out',
-        stagger: 0.07,
-        clearProps: 'filter',
-      }
-    );
   } else {
     const sel = selections[stepIdx];
     const isLast = stepIdx === STEPS.length - 1;
@@ -209,15 +227,13 @@ function renderTracker() {
     `;
   }
 
-  if (phase === 'confirm') {
-    const confirmEls = [
-      tracker.querySelector('.tracker-selected-icon'),
-      tracker.querySelector('.tracker-q'),
-      tracker.querySelector('.tracker-sub'),
-      ...tracker.querySelectorAll('.tracker-actions .btn'),
-    ].filter(Boolean);
+  let entranceEls = getTrackerAnimatedEls();
+  if (opts.excludeSelectedIcon) {
+    entranceEls = entranceEls.filter((el) => !el.classList.contains('tracker-selected-icon'));
+  }
+  if (entranceEls.length) {
     gsap.fromTo(
-      confirmEls,
+      entranceEls,
       { opacity: 0, x: 40, filter: 'blur(10px)' },
       {
         opacity: 1,
@@ -236,20 +252,92 @@ function renderTracker() {
   });
 }
 
-function selectOption(opt) {
-  selections[stepIdx] = opt;
-  phase = 'confirm';
-  renderTracker();
+function selectOption(opt, btnEl) {
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const srcIcon = btnEl.querySelector('.mood-ico');
+
+  // Exit other select-phase elements in parallel with the press feedback.
+  const otherEls = getTrackerAnimatedEls().filter((el) => el !== btnEl);
+  gsap.killTweensOf(otherEls);
+  gsap.to(otherEls, {
+    opacity: 0,
+    x: -40,
+    filter: 'blur(10px)',
+    duration: 0.35,
+    ease: 'power3.in',
+    stagger: 0.04,
+  });
+
+  // Press-down feedback on the tapped icon, then immediately fly to confirm header.
+  gsap.killTweensOf(srcIcon);
+  const pressTl = gsap.timeline();
+  pressTl.to(srcIcon, { scale: 0.8, duration: 0.12, ease: 'power2.out' })
+         .to(srcIcon, { scale: 1, duration: 0.18, ease: 'back.out(2)' });
+  pressTl.eventCallback('onComplete', () => {
+      const finalSrc = srcIcon.getBoundingClientRect();
+
+      selections[stepIdx] = opt;
+      phase = 'confirm';
+      renderTracker({ excludeSelectedIcon: true });
+
+      const dstIcon = tracker.querySelector('.tracker-selected-icon');
+      const dstRect = dstIcon.getBoundingClientRect();
+
+      // FLIP delta: from target to source center, plus scale (48 → 32).
+      const dx = (finalSrc.left + finalSrc.width / 2) - (dstRect.left + dstRect.width / 2);
+      const dy = (finalSrc.top + finalSrc.height / 2) - (dstRect.top + dstRect.height / 2);
+      const startScale = finalSrc.width / dstRect.width;
+
+      gsap.set(dstIcon, {
+        opacity: 1,
+        filter: 'none',
+        x: dx,
+        y: dy,
+        scale: startScale,
+        transformOrigin: '50% 50%',
+      });
+
+      // Smooth quadratic-bezier arc with fast start and a single soft bounce at landing.
+      const ARC_PEAK_LIFT = 55;
+      const ctrlX = dx / 2;
+      const ctrlY = dy - 2 * ARC_PEAK_LIFT;
+      const ARC_DURATION = 0.55;
+
+      const driver = { t: 0 };
+      gsap.to(driver, {
+        t: 1,
+        duration: ARC_DURATION,
+        ease: 'back.out(1.4)',
+        onUpdate: () => {
+          const t = driver.t;
+          const u = 1 - t;
+          const x = u * u * dx + 2 * u * t * ctrlX;
+          const y = u * u * dy + 2 * u * t * ctrlY;
+          gsap.set(dstIcon, { x, y });
+        },
+        onComplete: () => {
+          isTransitioning = false;
+        },
+      });
+      gsap.to(dstIcon, {
+        scale: 1,
+        duration: ARC_DURATION,
+        ease: 'back.out(1.6)',
+      });
+  });
 }
 
 function handleAction(action) {
   switch (action) {
     case 'prevStep':
-      if (stepIdx > 0) { stepIdx--; phase = 'confirm'; renderTracker(); }
+      if (stepIdx > 0) {
+        transitionRender(() => { stepIdx--; phase = 'confirm'; });
+      }
       break;
     case 'backConfirm':
-      phase = 'select';
-      renderTracker();
+      transitionRender(() => { phase = 'select'; });
       break;
     case 'choose':
       openReasonsModal();
@@ -265,89 +353,121 @@ function handleAction(action) {
 
 function goNextStep() {
   if (stepIdx < STEPS.length - 1) {
-    stepIdx++;
-    phase = 'select';
-    renderTracker();
+    transitionRender(() => { stepIdx++; phase = 'select'; });
   } else {
     finishFlow();
   }
 }
 
 function finishFlow() {
+  if (isTransitioning) return;
+  isTransitioning = true;
+  // Mirror-exit the last-step elements first, then play the success FX.
+  animateOutTracker(() => {
+    isTransitioning = false;
+    runSuccessFX();
+  });
+}
+
+function runSuccessFX() {
   const h = trackerWrap.getBoundingClientRect().height;
   trackerWrap.style.maxHeight = h + 'px';
   void trackerWrap.offsetHeight;
 
-  // Center checkmark inside the tracker
+  // Success composition: bg line + illustration + done icon
+  const BG_LINE_D = 'M30.0051 65.0765L195.639 160.385C201.258 163.619 208.188 159.176 207.595 152.72L197.141 38.8394C196.444 31.2494 205.75 27.0771 210.953 32.6466L319.774 149.126C324.142 153.8 331.957 151.712 333.411 145.482L353.047 61.3373C354.431 55.4086 361.666 53.1365 366.191 57.21L466.005 147.076';
   tracker.innerHTML = `
-    <div class="fx-wrap" style="position:relative;width:100%;height:${h}px;display:flex;align-items:center;justify-content:center;overflow:visible;">
-      <svg viewBox="0 0 120 120" style="width:80px;height:80px;display:block;">
-        <circle class="fx-disc" cx="60" cy="60" r="0" fill="#FFB800"/>
-        <path class="fx-check" d="M42 60 l13 13 l26 -26" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <div class="fx-wrap">
+      <svg class="fx-bgline" viewBox="0 0 496 192" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <path d="${BG_LINE_D}" stroke="#344079" stroke-opacity="0.06" stroke-width="60" stroke-linecap="round" fill="none"/>
       </svg>
+      <img class="fx-illu" src="assets/успех/illustartion_calm.png" alt="" />
+      <div class="fx-done">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <circle class="fx-circle" cx="24" cy="24" r="19" fill="none" stroke="#1E1E1E" stroke-width="2.5" stroke-linecap="round"/>
+          <path class="fx-check" d="M15 23.3529L22.4074 31L35 18" fill="none" stroke="#1E1E1E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
   `;
 
-  const disc = tracker.querySelector('.fx-disc');
-  const check = tracker.querySelector('.fx-check');
-  const checkLen = check.getTotalLength();
-  gsap.set(check, { strokeDasharray: checkLen, strokeDashoffset: checkLen });
+  const bglineEl = tracker.querySelector('.fx-bgline path');
+  const circleEl = tracker.querySelector('.fx-circle');
+  const checkEl  = tracker.querySelector('.fx-check');
+  const doneEl   = tracker.querySelector('.fx-done');
+  const illuEl   = tracker.querySelector('.fx-illu');
 
-  // Confetti — fullscreen overlay so pieces can fly beyond the card
+  const bgLen = bglineEl.getTotalLength();
+  const circumference = 2 * Math.PI * 19;
+  const checkLen = checkEl.getTotalLength();
+
+  gsap.set(bglineEl, { strokeDasharray: bgLen, strokeDashoffset: bgLen });
+  gsap.set(circleEl, { strokeDasharray: circumference, strokeDashoffset: circumference, opacity: 0 });
+  gsap.set(checkEl,  { strokeDasharray: checkLen, strokeDashoffset: checkLen, opacity: 0 });
+  gsap.set(doneEl, { y: -28, scale: 0.6, opacity: 0 });
+  gsap.set(illuEl, { y: 60, opacity: 0 });
+
+  // Realistic-look confetti via canvas-confetti (kirilv.com preset),
+  // colors equally distributed across 4 brand tones from the mockup.
   const trackerRect = trackerWrap.getBoundingClientRect();
-  const originX = trackerRect.left + trackerRect.width / 2;
-  const originY = trackerRect.top + trackerRect.height / 2;
-
-  const confetti = document.createElement('div');
-  confetti.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
-  document.body.appendChild(confetti);
-
-  const palette = ['#FFB800', '#FFD766', '#FFC947', '#FFA500', '#FFE6A3', '#E89F00'];
-  const PIECES = 70;
-  const pieces = [];
-  for (let i = 0; i < PIECES; i++) {
-    const el = document.createElement('div');
-    const w = 6 + Math.random() * 8;
-    const hPiece = w * (0.4 + Math.random() * 0.9);
-    const isCircle = Math.random() < 0.15;
-    el.style.cssText = `position:absolute;left:${originX}px;top:${originY}px;width:${w}px;height:${hPiece}px;background:${palette[i % palette.length]};border-radius:${isCircle ? '50%' : '1.5px'};margin-left:${-w / 2}px;margin-top:${-hPiece / 2}px;will-change:transform,opacity;`;
-    confetti.appendChild(el);
-    pieces.push(el);
-  }
-
-  pieces.forEach((el) => {
-    // Burst angle — biased upward for a natural fountain
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25;
-    const velocity = 180 + Math.random() * 360;
-    const dx = Math.cos(angle) * velocity;
-    const dyUp = Math.sin(angle) * velocity;
-    const fall = 500 + Math.random() * 500;
-    const rotStart = Math.random() * 360;
-    const rotEnd = rotStart + (Math.random() - 0.5) * 1400;
-    const dur = 1.7 + Math.random() * 1.1;
-
-    gsap.set(el, { rotation: rotStart, scale: 0.75 + Math.random() * 0.7 });
-    gsap.to(el, {
-      keyframes: [
-        { x: dx * 0.55, y: dyUp * 0.55, duration: dur * 0.38, ease: 'power1.out' },
-        { x: dx, y: dyUp + fall, duration: dur * 0.62, ease: 'power2.in' },
-      ],
+  const origin = {
+    x: (trackerRect.left + trackerRect.width / 2) / window.innerWidth,
+    y: (trackerRect.top + trackerRect.height / 2) / window.innerHeight,
+  };
+  const COLORS = ['#4E97F7', '#FF7A38', '#FFC400', '#FF5252'];
+  const count = 200;
+  // Fire each preset once per color so all 4 colors get equal share
+  const fire = (particleRatio, opts) => {
+    const perColor = Math.max(1, Math.floor((count * particleRatio) / COLORS.length));
+    COLORS.forEach((c) => {
+      confetti({
+        origin,
+        ...opts,
+        colors: [c],
+        particleCount: perColor,
+      });
     });
-    gsap.to(el, { rotation: rotEnd, duration: dur, ease: 'none' });
-    gsap.to(el, { opacity: 0, duration: dur * 0.35, delay: dur * 0.65, ease: 'power1.in' });
-  });
+  };
+  // Soften the opening burst: lower initial velocity and stagger waves slightly.
+  fire(0.25, { spread: 40, startVelocity: 38 });
+  setTimeout(() => fire(0.2,  { spread: 60, startVelocity: 42 }), 80);
+  setTimeout(() => fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 }), 160);
+  setTimeout(() => fire(0.1,  { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 }), 240);
+  setTimeout(() => fire(0.1,  { spread: 120, startVelocity: 45 }), 320);
 
   const tl = gsap.timeline({
     onComplete: () => {
-      gsap.to(tracker, { opacity: 0, filter: 'blur(8px)', duration: 0.35, ease: 'power2.in' });
-      gsap.delayedCall(0.12, () => trackerWrap.classList.add('is-hidden'));
+      // Hold the success state briefly so the user can see the result,
+      // then fade tracker with strong blur + scale for a clearly visible exit.
+      gsap.to(tracker, {
+        opacity: 0,
+        scale: 0,
+        filter: 'blur(100px)',
+        transformOrigin: '50% 50%',
+        duration: 1.4,
+        delay: 0.35,
+        ease: 'power2.inOut',
+      });
+      // Wrap collapse starts late so most of the scale/blur/opacity is visible
+      // before the wrap height transition kicks in.
+      gsap.delayedCall(0.35 + 0.95, () => trackerWrap.classList.add('is-hidden'));
     },
   });
-  tl.to(disc, { attr: { r: 44 }, duration: 0.55, ease: 'back.out(1.8)' }, 0)
-    .to(check, { strokeDashoffset: 0, duration: 0.4, ease: 'power2.out' }, 0.35)
-    .to({}, { duration: 1.6 });
 
-  gsap.delayedCall(3.2, () => confetti.remove());
+  // All in-container animations 35% slower than the previous pass
+  tl.to(bglineEl, { strokeDashoffset: 0, duration: 1.61, ease: 'power2.out' }, 0)
+    .to(doneEl, { y: 0, scale: 1, opacity: 1, duration: 1.04, ease: 'back.out(2.2)' }, 0)
+    .set(circleEl, { opacity: 1 }, 0.34)
+    .to(circleEl, { strokeDashoffset: 0, duration: 0.945, ease: 'power2.inOut' }, 0.34)
+    .set(checkEl, { opacity: 1 }, 0.61)
+    .to(checkEl, { strokeDashoffset: 0, duration: 0.66, ease: 'power2.out' }, 0.61)
+    // Illustration: slides up from below with a very smooth ease.
+    .fromTo(illuEl,
+      { y: 60, opacity: 0 },
+      { y: 0, opacity: 1, duration: 1.2, ease: 'expo.out' },
+      0.41
+    );
+
 }
 
 // ===== Reasons modal =====
